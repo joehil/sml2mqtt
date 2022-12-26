@@ -1,20 +1,16 @@
 /*
    Program for isolating and publishing smartmeter sml messages to a mqtt broker by using a esp8266.
    Version 1 for nodeMCU or Adafruit Huzzah boards
-
    @author Tim Abels <rollercontainer@googlemail.com>
    @see The GNU Public License (GPL)
-
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
-
    This program is distributed in the hope that it will be useful, but
    WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
    or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
    for more details.
-
    You should have received a copy of the GNU General Public License along
    with this program; if not, see <http://www.gnu.org/licenses/>.
 */
@@ -37,13 +33,16 @@
 // make your own config file or remove this line and use the following lines
 const char* clientId = "smartmeter";
 const char* mqtt_server = "192.168.0.211";
-const char* ssid = "<ssid>";
-const char* password = "<password>";
+const char* ssid = "lallinger";
+const char* password = "Fritz9.3.1990";
 IPAddress ip(192, 168, 0, 99); // Static IP
 IPAddress dns(192, 168, 0, 1); // most likely your router
 IPAddress gateway(192, 168, 0, 1); // most likely your router
 IPAddress subnet(255, 255, 255, 0);
 
+WiFiEventHandler stationDisconnectedHandler;
+
+int ev2cnt=0;
 byte inByte; // for reading from serial
 byte invert[8];
 byte smlMessage[700]; // for storing the the isolated message. Mine was 280 bytes, but may vary...
@@ -99,6 +98,12 @@ void findStopSequence();
 void publishMessage();
 void parseSml();
 
+void onStationDisconnected(const WiFiEventStationModeDisconnected& evt) {
+      WiFi.reconnect();
+      ev2cnt++;
+      if (ev2cnt > 20) 
+         ESP.restart();
+}
 
 void setup_wifi() {
   delay(10);
@@ -106,6 +111,8 @@ void setup_wifi() {
   Serial.println(ssid);
   WiFi.config(ip, dns, gateway, subnet);
   WiFi.mode(WIFI_STA);
+  WiFi.setAutoReconnect(false);
+  stationDisconnectedHandler = WiFi.onStationModeDisconnected(&onStationDisconnected);
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
@@ -266,7 +273,7 @@ void publishMessage() {
     myPtr += 2; //increment the pointer by two characters in charArr so that next time the null from the previous go is overwritten.
   }
 
-  if (count > 6000000){
+  if (count > 2000000){
     Serial.println(smlMessageAsString); // for debuging
     parseSml();
     count = 0;
@@ -290,7 +297,7 @@ void parseSml(){
       for (j = 0; j < entries[n].olen; j++){
         if (smlMessage[i+j] != entries[n].OBIS[j]) {
           found = 0;
-          break;
+         
         }
       }
       if (found){
@@ -316,3 +323,4 @@ void parseSml(){
     }
   }
 }
+
